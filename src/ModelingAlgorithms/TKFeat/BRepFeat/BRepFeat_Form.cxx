@@ -805,8 +805,9 @@ void BRepFeat_Form::GlobalPerform()
     // caller wants to do a cut from base on its own. So, just return the
     // feature without filtering.
     //
-    // if(myJustFeat && myPerfSelection == BRepFeat_NoSelection)
-    if (myJustFeat)
+    // AstoCAD local revert of e8e2758d6f: with an Until/From selection the prism must
+    // still be trimmed below, otherwise up-to-face pads run through the part.
+    if (myJustFeat && myPerfSelection == BRepFeat_NoSelection)
     {
       myShape = theGShape;
       Done();
