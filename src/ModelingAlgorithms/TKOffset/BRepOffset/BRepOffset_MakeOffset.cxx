@@ -1082,6 +1082,13 @@ static bool WallsCrossAtRemovedFace(
     anEF;
   TopExp::MapShapesAndAncestors(theShape, TopAbs_EDGE, TopAbs_FACE, anEF);
   NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> anOffsets;
+  // Each offset's box, as BRepExtrema_DistShapeShape makes it to skip pairs:
+  // two offsets whose boxes are farther apart than the tolerance are, and
+  // the exact distance is not asked. Asked for every pair, it was the cost of
+  // the whole thick solid: a 40 x 40 x 10 plate with 16 holes, its top
+  // removed, has 20 faces beside the top and 186 pairs of them not touching:
+  // 0.7 s, for a thick solid stock OCCT makes in 0.045 s.
+  NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> aBoxes;
   for (int i = 1; i <= theRemoved.Extent(); ++i)
   {
     // The faces beside this removed face, in the shape's order.
@@ -1134,7 +1141,16 @@ static bool WallsCrossAtRemovedFace(
               return false;
             }
             aOff[m] = anOffsets.Bound(aF, anOF.Face());
+            Bnd_Box aBox;
+            BRepBndLib::Add(*aOff[m], aBox);
+            aBoxes.Bind(aF, aBox);
           }
+        }
+        const Bnd_Box& aBox1 = aBoxes.Find(aF1);
+        const Bnd_Box& aBox2 = aBoxes.Find(aF2);
+        if (!aBox1.IsVoid() && !aBox2.IsVoid() && aBox1.Distance(aBox2) > theTol)
+        {
+          continue;
         }
         BRepExtrema_DistShapeShape aDist(*aOff[0], *aOff[1]);
         if (aDist.IsDone() && aDist.Value() <= theTol)
